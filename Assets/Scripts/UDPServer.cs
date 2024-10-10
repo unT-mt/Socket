@@ -16,6 +16,9 @@ public class UDPServer : MonoBehaviour
     private Thread receiveThread;
     private ConcurrentQueue<string> incomingMessages = new ConcurrentQueue<string>();
 
+    private int sendSequenceNumber = 0; // 送信側シーケンス番号
+    private int expectedReceiveSequence = 1; // 受信側期待シーケンス番号
+
     void Start()
     {
         udpServer = new UdpClient(5000); // ポート5000で待ち受け
@@ -64,40 +67,68 @@ public class UDPServer : MonoBehaviour
         // サーバーの青Cubeの位置をクライアントに送信
         if (clientEndPoint != null)
         {
-            string message = $"{blueCube.transform.position.x},{blueCube.transform.position.y}";
+            sendSequenceNumber++;
+            string message = $"{sendSequenceNumber}:{blueCube.transform.position.x},{blueCube.transform.position.y}";
             byte[] data = Encoding.UTF8.GetBytes(message);
             udpServer.Send(data, data.Length, clientEndPoint);
-            //Debug.Log($"サーバー送信: {message} to {clientEndPoint}");
+            // Debug.Log($"サーバー送信: {message} to {clientEndPoint}");
         }
 
         // クライアントからの赤Cubeの位置情報を処理
         while (incomingMessages.TryDequeue(out string clientData))
         {
-            string[] positions = clientData.Split(',');
-            if (positions.Length >= 2)
+            // メッセージをシーケンス番号とデータに分割
+            string[] parts = clientData.Split(':');
+            if (parts.Length != 2)
             {
-                if (float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
+                Debug.LogWarning("不正なメッセージ形式: " + clientData);
+                continue;
+            }
+
+            if (int.TryParse(parts[0], out int receivedSequence))
+            {
+                if (receivedSequence > expectedReceiveSequence)
                 {
-                    if (redCube == null)
-                    {
-                        // redCubeが未生成の場合、生成する
-                        redCube = CreateColoredCube(Color.red, new Vector3(x, y, 0));
-                        Debug.Log("redCubeを生成しました");
-                    }
-                    else
-                    {
-                        // redCubeの位置を更新
-                        redCube.transform.position = new Vector3(x, y, 0);
-                    }
+                    Debug.LogWarning($"パケット損失検出: 期待 {expectedReceiveSequence} だが {receivedSequence} を受信");
+                    expectedReceiveSequence = receivedSequence + 1; // 次の期待シーケンス番号を更新
+                }
+                else if (receivedSequence < expectedReceiveSequence)
+                {
+                    Debug.LogWarning($"パケット順序乱れ検出: 期待 {expectedReceiveSequence} だが {receivedSequence} を受信");
+                    // 重複パケットとして無視するか、再処理するかを選択
                 }
                 else
                 {
-                    Debug.LogWarning("位置データのパースに失敗: " + clientData);
+                    expectedReceiveSequence++;
+                }
+
+                string data = parts[1];
+                string[] positions = data.Split(',');
+                if (positions.Length >= 2)
+                {
+                    if (float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
+                    {
+                        if (redCube == null)
+                        {
+                            // redCubeが未生成の場合、生成する
+                            redCube = CreateColoredCube(Color.red, new Vector3(x, y, 0));
+                            Debug.Log("redCubeを生成しました");
+                        }
+                        else
+                        {
+                            // redCubeの位置を更新
+                            redCube.transform.position = new Vector3(x, y, 0);
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning("位置データのパースに失敗: " + data);
+                    }
                 }
             }
             else
             {
-                Debug.LogWarning("不正なメッセージ形式: " + clientData);
+                Debug.LogWarning("シーケンス番号のパースに失敗: " + parts[0]);
             }
         }
     }

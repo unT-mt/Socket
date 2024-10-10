@@ -16,6 +16,9 @@ public class UDPClient : MonoBehaviour
     private Thread receiveThread;
     private ConcurrentQueue<string> incomingMessages = new ConcurrentQueue<string>();
 
+    private int sendSequenceNumber = 0; // 送信側シーケンス番号
+    private int expectedReceiveSequence = 1; // 受信側期待シーケンス番号
+
     void Start()
     {
         // 赤Cubeを生成
@@ -51,10 +54,11 @@ public class UDPClient : MonoBehaviour
     {
         if (udpClient != null)
         {
-            string message = $"{redCube.transform.position.x},{redCube.transform.position.y}";
+            sendSequenceNumber++;
+            string message = $"{sendSequenceNumber}:{redCube.transform.position.x},{redCube.transform.position.y}";
             byte[] data = Encoding.UTF8.GetBytes(message);
             udpClient.Send(data, data.Length);
-            //Debug.Log($"クライアント初回送信: {message}");
+            Debug.Log($"クライアント初回送信: {message}");
         }
     }
 
@@ -67,7 +71,7 @@ public class UDPClient : MonoBehaviour
                 IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
                 byte[] data = udpClient.Receive(ref remoteEndPoint);
                 string message = Encoding.UTF8.GetString(data);
-                //Debug.Log($"クライアント受信: {message} from {remoteEndPoint}");
+                // Debug.Log($"クライアント受信: {message} from {remoteEndPoint}");
                 if (!string.IsNullOrEmpty(message))
                 {
                     incomingMessages.Enqueue(message);
@@ -94,40 +98,68 @@ public class UDPClient : MonoBehaviour
         // クライアントの赤Cubeの位置をサーバーに送信
         if (udpClient != null)
         {
-            string message = $"{redCube.transform.position.x},{redCube.transform.position.y}";
+            sendSequenceNumber++;
+            string message = $"{sendSequenceNumber}:{redCube.transform.position.x},{redCube.transform.position.y}";
             byte[] data = Encoding.UTF8.GetBytes(message);
             udpClient.Send(data, data.Length);
-            //Debug.Log($"クライアント送信: {message}");
+            // Debug.Log($"クライアント送信: {message}");
         }
 
         // サーバーからの青Cubeの位置情報を処理
         while (incomingMessages.TryDequeue(out string serverData))
         {
-            string[] positions = serverData.Split(',');
-            if (positions.Length >= 2)
+            // メッセージをシーケンス番号とデータに分割
+            string[] parts = serverData.Split(':');
+            if (parts.Length != 2)
             {
-                if (float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
+                Debug.LogWarning("不正なメッセージ形式: " + serverData);
+                continue;
+            }
+
+            if (int.TryParse(parts[0], out int receivedSequence))
+            {
+                if (receivedSequence > expectedReceiveSequence)
                 {
-                    // サーバーの青Cubeを動かす
-                    if (blueCube == null)
-                    {
-                        // 初回のみ青Cubeを生成
-                        blueCube = CreateColoredCube(Color.blue, new Vector3(x, y, 0));
-                        Debug.Log("blueCubeを生成しました");
-                    }
-                    else
-                    {
-                        blueCube.transform.position = new Vector3(x, y, 0);
-                    }
+                    Debug.LogWarning($"パケット損失検出: 期待 {expectedReceiveSequence} だが {receivedSequence} を受信");
+                    expectedReceiveSequence = receivedSequence + 1; // 次の期待シーケンス番号を更新
+                }
+                else if (receivedSequence < expectedReceiveSequence)
+                {
+                    Debug.LogWarning($"パケット順序乱れ検出: 期待 {expectedReceiveSequence} だが {receivedSequence} を受信");
+                    // 重複パケットとして無視するか、再処理するかを選択
                 }
                 else
                 {
-                    Debug.LogWarning("位置データのパースに失敗: " + serverData);
+                    expectedReceiveSequence++;
+                }
+
+                string data = parts[1];
+                string[] positions = data.Split(',');
+                if (positions.Length >= 2)
+                {
+                    if (float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
+                    {
+                        if (blueCube == null)
+                        {
+                            // 初回のみ青Cubeを生成
+                            blueCube = CreateColoredCube(Color.blue, new Vector3(x, y, 0));
+                            Debug.Log("blueCubeを生成しました");
+                        }
+                        else
+                        {
+                            // blueCubeの位置を更新
+                            blueCube.transform.position = new Vector3(x, y, 0);
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning("位置データのパースに失敗: " + data);
+                    }
                 }
             }
             else
             {
-                Debug.LogWarning("不正なメッセージ形式: " + serverData);
+                Debug.LogWarning("シーケンス番号のパースに失敗: " + parts[0]);
             }
         }
     }

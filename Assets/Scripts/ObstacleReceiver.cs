@@ -154,7 +154,7 @@ public class ObstacleReceiver : MonoBehaviour
         float angleDegrees = stepAngleDegrees * rayId + offsetDegrees;
         float angleRadians = angleDegrees * Mathf.Deg2Rad;
 
-        Vector3 direction = new Vector3(Mathf.Cos(angleRadians), 0, Mathf.Sin(angleRadians));
+        Vector3 direction = new Vector3(-Mathf.Sin(angleRadians), 0, Mathf.Cos(angleRadians));
         Vector3 position = transform.position + direction * distance;
 
         return position;

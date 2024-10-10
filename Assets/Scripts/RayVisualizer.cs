@@ -84,7 +84,7 @@ namespace Urg
             {
                 float distance = Mathf.Clamp(distances[i], 0f, maxDistance);
                 float angle = StepAngleRadians * i + OffsetRadians;
-                Vector3 direction = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle));
+                Vector3 direction = new Vector3(-Mathf.Sin(angle), 0, Mathf.Cos(angle));
                 Vector3 startPos = urg.transform.position;
                 Vector3 endPos = startPos + direction * distance;
 

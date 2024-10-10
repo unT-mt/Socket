@@ -72,6 +72,13 @@ public class ObstacleReceiver : MonoBehaviour
                     break;
                 }
 
+                // オブジェクトが破棄されている場合は処理を中断
+                if (this == null)
+                {
+                    Debug.LogWarning("ObstacleReceiverが既に破棄されています。受信ループを終了します。");
+                    break;
+                }
+
                 string receivedData = Encoding.UTF8.GetString(result.Buffer).Trim();
                 Debug.Log($"受信: {receivedData}");
 
@@ -84,7 +91,7 @@ public class ObstacleReceiver : MonoBehaviour
         }
         finally
         {
-            udpClient.Close();
+            // finally ブロックから udpClient.Close() を削除
             Debug.Log("受信ループが終了しました。");
         }
     }

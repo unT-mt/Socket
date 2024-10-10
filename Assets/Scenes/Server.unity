@@ -495,12 +495,11 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1306920649}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f1286e6baa5e6c845aae3556a76ff9ae, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  blueCube: {fileID: 0}
 --- !u!114 &1306920653
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -508,9 +507,9 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1306920649}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b77615765e0d1e145a0703fc25f600a6, type: 3}
+  m_Script: {fileID: 11500000, guid: ced620a6766ef734bbc2d61bd7a71b13, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!1 &1709087268

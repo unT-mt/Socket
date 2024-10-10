@@ -1,68 +1,46 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
-using System.IO;
+using System.Text;
 using System.Threading;
 using UnityEngine;
 using System.Collections.Concurrent;
 
-public class TCPServer : MonoBehaviour
+public class UDPServer : MonoBehaviour
 {
     private GameObject blueCube; // サーバー側の青Cube
     private GameObject redCube;  // クライアント側の赤Cube
-    private TcpListener server;
-    private TcpClient client;
-    private StreamReader reader;
-    private StreamWriter writer;
+    private UdpClient udpServer;
+    private IPEndPoint clientEndPoint;
 
-    private Thread listenThread;
     private Thread receiveThread;
     private ConcurrentQueue<string> incomingMessages = new ConcurrentQueue<string>();
 
     void Start()
     {
-        server = new TcpListener(IPAddress.Any, 5000); // ポート5000で待ち受け
-        server.Start();
-        Debug.Log("サーバーが起動しました");
-        listenThread = new Thread(ListenForClients);
-        listenThread.IsBackground = true;
-        listenThread.Start();
+        udpServer = new UdpClient(5000); // ポート5000で待ち受け
+        Debug.Log("UDPサーバーが起動しました");
+        receiveThread = new Thread(ReceiveData);
+        receiveThread.IsBackground = true;
+        receiveThread.Start();
 
         // 青Cubeを生成
         blueCube = CreateColoredCube(Color.blue, new Vector3(0, 0.5f, 0));
-    }
-
-    void ListenForClients()
-    {
-        try
-        {
-            client = server.AcceptTcpClient();
-            Debug.Log("クライアントが接続しました");
-            reader = new StreamReader(client.GetStream());
-            writer = new StreamWriter(client.GetStream()) { AutoFlush = true };
-            receiveThread = new Thread(ReceiveData);
-            receiveThread.IsBackground = true;
-            receiveThread.Start();
-
-            // 赤Cubeを生成
-            redCube = CreateColoredCube(Color.red, new Vector3(2, 0.5f, 0)); // サーバー上では位置を少しずらす
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("サーバーエラー: " + e.Message);
-        }
     }
 
     void ReceiveData()
     {
         try
         {
-            while (client.Connected)
+            while (true)
             {
-                string data = reader.ReadLine();
-                if (!string.IsNullOrEmpty(data))
+                // データを受信
+                byte[] data = udpServer.Receive(ref clientEndPoint);
+                string message = Encoding.UTF8.GetString(data);
+                //Debug.Log($"サーバー受信: {message} from {clientEndPoint}");
+                if (!string.IsNullOrEmpty(message))
                 {
-                    incomingMessages.Enqueue(data);
+                    incomingMessages.Enqueue(message);
                 }
             }
         }
@@ -84,27 +62,13 @@ public class TCPServer : MonoBehaviour
         blueCube.transform.position += move;
 
         // サーバーの青Cubeの位置をクライアントに送信
-        if (client != null && client.Connected)
+        if (clientEndPoint != null)
         {
             string message = $"{blueCube.transform.position.x},{blueCube.transform.position.y}";
-            writer.WriteLine(message);
+            byte[] data = Encoding.UTF8.GetBytes(message);
+            udpServer.Send(data, data.Length, clientEndPoint);
+            //Debug.Log($"サーバー送信: {message} to {clientEndPoint}");
         }
-        //送信の頻度を下げる場合は下記のコード
-        // private float sendInterval = 0.05f; // 20Hz
-        // private float sendTimer = 0f;
-        // // 送信タイマーを更新
-        // sendTimer += Time.deltaTime;
-        // if (sendTimer >= sendInterval)
-        // {
-        //     sendTimer = 0f;
-
-        //     // サーバーの青Cubeの位置をクライアントに送信
-        //     if (client != null && client.Connected)
-        //     {
-        //         string message = $"{blueCube.transform.position.x},{blueCube.transform.position.y}";
-        //         writer.WriteLine(message);
-        //     }
-        // }
 
         // クライアントからの赤Cubeの位置情報を処理
         while (incomingMessages.TryDequeue(out string clientData))
@@ -114,25 +78,34 @@ public class TCPServer : MonoBehaviour
             {
                 if (float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
                 {
-                    // クライアントの赤Cubeを動かす
-                    redCube.transform.position = new Vector3(x, y, 0);
+                    if (redCube == null)
+                    {
+                        // redCubeが未生成の場合、生成する
+                        redCube = CreateColoredCube(Color.red, new Vector3(x, y, 0));
+                        Debug.Log("redCubeを生成しました");
+                    }
+                    else
+                    {
+                        // redCubeの位置を更新
+                        redCube.transform.position = new Vector3(x, y, 0);
+                    }
                 }
                 else
                 {
                     Debug.LogWarning("位置データのパースに失敗: " + clientData);
                 }
             }
+            else
+            {
+                Debug.LogWarning("不正なメッセージ形式: " + clientData);
+            }
         }
     }
 
     void OnApplicationQuit()
     {
-        if (client != null)
-            client.Close();
-        if (server != null)
-            server.Stop();
-        if (listenThread != null && listenThread.IsAlive)
-            listenThread.Abort();
+        if (udpServer != null)
+            udpServer.Close();
         if (receiveThread != null && receiveThread.IsAlive)
             receiveThread.Abort();
     }

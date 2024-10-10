@@ -1,55 +1,43 @@
 using System;
-using System.Net;
 using System.Net.Sockets;
 using System.IO;
 using System.Threading;
 using UnityEngine;
 using System.Collections.Concurrent;
 
-public class Server : MonoBehaviour
+public class TCPClient : MonoBehaviour
 {
-    public GameObject blueCube; // サーバー側の青Cube
-    public GameObject redCube;  // クライアント側の赤Cube
-    private TcpListener server;
+    private GameObject redCube;   // クライアント側の赤Cube
+    private GameObject blueCube;  // サーバー側の青Cube
     private TcpClient client;
     private StreamReader reader;
     private StreamWriter writer;
 
-    private Thread listenThread;
     private Thread receiveThread;
     private ConcurrentQueue<string> incomingMessages = new ConcurrentQueue<string>();
 
     void Start()
     {
-        server = new TcpListener(IPAddress.Any, 5000); // ポート5000で待ち受け
-        server.Start();
-        Debug.Log("サーバーが起動しました");
-        listenThread = new Thread(ListenForClients);
-        listenThread.IsBackground = true;
-        listenThread.Start();
+        // 赤Cubeを生成
+        redCube = CreateColoredCube(Color.red, new Vector3(2, 0.5f, 0));
 
-        // 青Cubeを生成
-        blueCube = CreateColoredCube(Color.blue, new Vector3(0, 0.5f, 0));
-    }
-
-    void ListenForClients()
-    {
+        // サーバーに接続
+        client = new TcpClient();
         try
         {
-            client = server.AcceptTcpClient();
-            Debug.Log("クライアントが接続しました");
+            client.Connect("127.0.0.1", 5000);
+            Debug.Log("サーバーに接続しました");
             reader = new StreamReader(client.GetStream());
             writer = new StreamWriter(client.GetStream()) { AutoFlush = true };
             receiveThread = new Thread(ReceiveData);
             receiveThread.IsBackground = true;
             receiveThread.Start();
-
-            // 赤Cubeを生成
-            redCube = CreateColoredCube(Color.red, new Vector3(2, 0.5f, 0)); // サーバー上では位置を少しずらす
+    
+            blueCube = CreateColoredCube(Color.blue, new Vector3(0, 0.5f, 0));
         }
         catch (Exception e)
         {
-            Debug.LogError("サーバーエラー: " + e.Message);
+            Debug.LogError("クライアント接続エラー: " + e.Message);
         }
     }
 
@@ -74,19 +62,19 @@ public class Server : MonoBehaviour
 
     void Update()
     {
-        // サーバー側のCube移動 (上下左右キーで移動)
+        // クライアント側のCube移動 (上下左右キーで移動)
         Vector3 move = Vector3.zero;
-        if (Input.GetKey(KeyCode.UpArrow)) move += Vector3.up * Time.deltaTime;
-        if (Input.GetKey(KeyCode.DownArrow)) move += Vector3.down * Time.deltaTime;
-        if (Input.GetKey(KeyCode.LeftArrow)) move += Vector3.left * Time.deltaTime;
-        if (Input.GetKey(KeyCode.RightArrow)) move += Vector3.right * Time.deltaTime;
+        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) move += Vector3.up * Time.deltaTime;
+        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) move += Vector3.down * Time.deltaTime;
+        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) move += Vector3.left * Time.deltaTime;
+        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) move += Vector3.right * Time.deltaTime;
 
-        blueCube.transform.position += move;
+        redCube.transform.position += move;
 
-        // サーバーの青Cubeの位置をクライアントに送信
+        // クライアントの赤Cubeの位置をサーバーに送信
         if (client != null && client.Connected)
         {
-            string message = $"{blueCube.transform.position.x},{blueCube.transform.position.y}";
+            string message = $"{redCube.transform.position.x},{redCube.transform.position.y}";
             writer.WriteLine(message);
         }
         //送信の頻度を下げる場合は下記のコード
@@ -98,28 +86,28 @@ public class Server : MonoBehaviour
         // {
         //     sendTimer = 0f;
 
-        //     // サーバーの青Cubeの位置をクライアントに送信
+        //     // クライアントの赤Cubeの位置をサーバーに送信
         //     if (client != null && client.Connected)
         //     {
-        //         string message = $"{blueCube.transform.position.x},{blueCube.transform.position.y}";
+        //         string message = $"{redCube.transform.position.x},{redCube.transform.position.y}";
         //         writer.WriteLine(message);
         //     }
         // }
 
-        // クライアントからの赤Cubeの位置情報を処理
-        while (incomingMessages.TryDequeue(out string clientData))
+        // サーバーからの青Cubeの位置情報を処理
+        while (incomingMessages.TryDequeue(out string serverData))
         {
-            string[] positions = clientData.Split(',');
+            string[] positions = serverData.Split(',');
             if (positions.Length >= 2)
             {
                 if (float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
                 {
-                    // クライアントの赤Cubeを動かす
-                    redCube.transform.position = new Vector3(x, y, 0);
+                    // サーバーの青Cubeを動かす
+                    blueCube.transform.position = new Vector3(x, y, 0);
                 }
                 else
                 {
-                    Debug.LogWarning("位置データのパースに失敗: " + clientData);
+                    Debug.LogWarning("位置データのパースに失敗: " + serverData);
                 }
             }
         }
@@ -129,10 +117,6 @@ public class Server : MonoBehaviour
     {
         if (client != null)
             client.Close();
-        if (server != null)
-            server.Stop();
-        if (listenThread != null && listenThread.IsAlive)
-            listenThread.Abort();
         if (receiveThread != null && receiveThread.IsAlive)
             receiveThread.Abort();
     }

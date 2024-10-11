@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks; // 追加
 using UnityEngine;
 
 namespace Urg
@@ -55,6 +56,17 @@ namespace Urg
             }
             lastSendTime = currentTime;
 
+            await SendDataAsync(distances); // 非同期メソッドをawait
+        }
+        
+        public async Task SendDataAsync(float[] distances)
+        {
+            if (distances == null)
+            {
+                Debug.LogWarning("Invalid distances array for sending.");
+                return;
+            }
+
             // CSVフォーマット: id,distance;id,distance;...
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < distances.Length; i++)
@@ -72,7 +84,7 @@ namespace Urg
 
             try
             {
-                await udpClient.SendAsync(sendData, sendData.Length, remoteEndPoint);
+                await udpClient.SendAsync(sendData, sendData.Length, remoteEndPoint); // 非同期送信
                 Debug.Log($"送信: {csvData}");
             }
             catch (Exception e)

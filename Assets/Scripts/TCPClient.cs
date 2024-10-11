@@ -1,7 +1,7 @@
 using System;
 using System.Net.Sockets;
 using System.IO;
-using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 using System.Collections.Concurrent;
 
@@ -12,8 +12,6 @@ public class TCPClient : MonoBehaviour
     private TcpClient client;
     private StreamReader reader;
     private StreamWriter writer;
-
-    private Thread receiveThread;
     private ConcurrentQueue<string> incomingMessages = new ConcurrentQueue<string>();
 
     void Start()
@@ -21,19 +19,25 @@ public class TCPClient : MonoBehaviour
         // 赤Cubeを生成
         redCube = CreateColoredCube(Color.red, new Vector3(2, 0.5f, 0));
 
+        StartClient();
+    }
+
+    async void StartClient()
+    {
         // サーバーに接続
         client = new TcpClient();
         try
         {
-            client.Connect("127.0.0.1", 5000);
+            await client.ConnectAsync("127.0.0.1", 5000);
             Debug.Log("サーバーに接続しました");
             reader = new StreamReader(client.GetStream());
             writer = new StreamWriter(client.GetStream()) { AutoFlush = true };
-            receiveThread = new Thread(ReceiveData);
-            receiveThread.IsBackground = true;
-            receiveThread.Start();
-    
+
+            // 青Cubeを生成
             blueCube = CreateColoredCube(Color.blue, new Vector3(0, 0.5f, 0));
+
+            // データ受信の非同期タスクを開始
+            await ReceiveDataAsync();
         }
         catch (Exception e)
         {
@@ -41,13 +45,13 @@ public class TCPClient : MonoBehaviour
         }
     }
 
-    void ReceiveData()
+    async Task ReceiveDataAsync()
     {
         try
         {
             while (client.Connected)
             {
-                string data = reader.ReadLine();
+                string data = await reader.ReadLineAsync();
                 if (!string.IsNullOrEmpty(data))
                 {
                     incomingMessages.Enqueue(data);
@@ -71,8 +75,8 @@ public class TCPClient : MonoBehaviour
 
         redCube.transform.position += move;
 
-        // クライアントの赤Cubeの位置をサーバーに送信
-        if (client != null && client.Connected)
+        // writerが初期化しているかを確認しクライアントの赤Cubeの位置をサーバーに送信
+        if (client != null && client.Connected && writer != null) 
         {
             string message = $"{redCube.transform.position.x},{redCube.transform.position.y}";
             writer.WriteLine(message);
@@ -87,7 +91,7 @@ public class TCPClient : MonoBehaviour
         //     sendTimer = 0f;
 
         //     // クライアントの赤Cubeの位置をサーバーに送信
-        //     if (client != null && client.Connected)
+        //     if (client != null && client.Connected && writer != null)
         //     {
         //         string message = $"{redCube.transform.position.x},{redCube.transform.position.y}";
         //         writer.WriteLine(message);
@@ -98,40 +102,25 @@ public class TCPClient : MonoBehaviour
         while (incomingMessages.TryDequeue(out string serverData))
         {
             string[] positions = serverData.Split(',');
-            if (positions.Length >= 2)
+            if (positions.Length >= 2 && float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
             {
-                if (float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
-                {
-                    // サーバーの青Cubeを動かす
-                    blueCube.transform.position = new Vector3(x, y, 0);
-                }
-                else
-                {
-                    Debug.LogWarning("位置データのパースに失敗: " + serverData);
-                }
+                blueCube.transform.position = new Vector3(x, y, 0);
             }
         }
     }
 
     void OnApplicationQuit()
     {
-        if (client != null)
-            client.Close();
-        if (receiveThread != null && receiveThread.IsAlive)
-            receiveThread.Abort();
+        client?.Close();
     }
 
-    // カラー付きキューブを生成するヘルパーメソッド
     private GameObject CreateColoredCube(Color color, Vector3 position)
     {
         GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
         Renderer renderer = cube.GetComponent<Renderer>();
-
-        // 新しいマテリアルを作成し、Standardシェーダーを設定
         Material newMaterial = new Material(Shader.Find("Standard"));
         newMaterial.color = color;
         renderer.material = newMaterial;
-
         cube.transform.position = position;
         return cube;
     }

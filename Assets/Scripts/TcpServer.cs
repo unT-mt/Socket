@@ -2,7 +2,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.IO;
-using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 using System.Collections.Concurrent;
 
@@ -14,38 +14,40 @@ public class TCPServer : MonoBehaviour
     private TcpClient client;
     private StreamReader reader;
     private StreamWriter writer;
-
-    private Thread listenThread;
-    private Thread receiveThread;
     private ConcurrentQueue<string> incomingMessages = new ConcurrentQueue<string>();
 
     void Start()
     {
+        // 青Cubeを生成
+        blueCube = CreateColoredCube(Color.blue, new Vector3(0, 0.5f, 0));
+
+        StartServer();
+    }
+
+    async void StartServer()
+    {
         server = new TcpListener(IPAddress.Any, 5000); // ポート5000で待ち受け
         server.Start();
         Debug.Log("サーバーが起動しました");
-        listenThread = new Thread(ListenForClients);
-        listenThread.IsBackground = true;
-        listenThread.Start();
 
-        // 青Cubeを生成
-        blueCube = CreateColoredCube(Color.blue, new Vector3(0, 0.5f, 0));
+        // クライアントの接続を待つ
+        await ListenForClientsAsync();
     }
 
-    void ListenForClients()
+    async Task ListenForClientsAsync()
     {
         try
         {
-            client = server.AcceptTcpClient();
+            client = await server.AcceptTcpClientAsync();
             Debug.Log("クライアントが接続しました");
             reader = new StreamReader(client.GetStream());
             writer = new StreamWriter(client.GetStream()) { AutoFlush = true };
-            receiveThread = new Thread(ReceiveData);
-            receiveThread.IsBackground = true;
-            receiveThread.Start();
 
             // 赤Cubeを生成
             redCube = CreateColoredCube(Color.red, new Vector3(2, 0.5f, 0)); // サーバー上では位置を少しずらす
+
+            // データ受信の非同期タスクを開始
+            await ReceiveDataAsync();
         }
         catch (Exception e)
         {
@@ -53,13 +55,13 @@ public class TCPServer : MonoBehaviour
         }
     }
 
-    void ReceiveData()
+    async Task ReceiveDataAsync()
     {
         try
         {
             while (client.Connected)
             {
-                string data = reader.ReadLine();
+                string data = await reader.ReadLineAsync();
                 if (!string.IsNullOrEmpty(data))
                 {
                     incomingMessages.Enqueue(data);
@@ -83,8 +85,8 @@ public class TCPServer : MonoBehaviour
 
         blueCube.transform.position += move;
 
-        // サーバーの青Cubeの位置をクライアントに送信
-        if (client != null && client.Connected)
+        // writerが初期化しているかを確認しサーバーの青Cubeの位置をクライアントに送信
+        if (client != null && client.Connected && writer != null)
         {
             string message = $"{blueCube.transform.position.x},{blueCube.transform.position.y}";
             writer.WriteLine(message);
@@ -98,8 +100,8 @@ public class TCPServer : MonoBehaviour
         // {
         //     sendTimer = 0f;
 
-        //     // サーバーの青Cubeの位置をクライアントに送信
-        //     if (client != null && client.Connected)
+        //     // クライアントの青Cubeの位置をサーバーに送信
+        //     if (client != null && client.Connected && writer != null)
         //     {
         //         string message = $"{blueCube.transform.position.x},{blueCube.transform.position.y}";
         //         writer.WriteLine(message);
@@ -110,44 +112,26 @@ public class TCPServer : MonoBehaviour
         while (incomingMessages.TryDequeue(out string clientData))
         {
             string[] positions = clientData.Split(',');
-            if (positions.Length >= 2)
+            if (positions.Length >= 2 && float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
             {
-                if (float.TryParse(positions[0], out float x) && float.TryParse(positions[1], out float y))
-                {
-                    // クライアントの赤Cubeを動かす
-                    redCube.transform.position = new Vector3(x, y, 0);
-                }
-                else
-                {
-                    Debug.LogWarning("位置データのパースに失敗: " + clientData);
-                }
+                redCube.transform.position = new Vector3(x, y, 0);
             }
         }
     }
 
     void OnApplicationQuit()
     {
-        if (client != null)
-            client.Close();
-        if (server != null)
-            server.Stop();
-        if (listenThread != null && listenThread.IsAlive)
-            listenThread.Abort();
-        if (receiveThread != null && receiveThread.IsAlive)
-            receiveThread.Abort();
+        client?.Close();
+        server?.Stop();
     }
 
-    // カラー付きキューブを生成するヘルパーメソッド
     private GameObject CreateColoredCube(Color color, Vector3 position)
     {
         GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
         Renderer renderer = cube.GetComponent<Renderer>();
-
-        // 新しいマテリアルを作成し、Standardシェーダーを設定
         Material newMaterial = new Material(Shader.Find("Standard"));
         newMaterial.color = color;
         renderer.material = newMaterial;
-
         cube.transform.position = position;
         return cube;
     }

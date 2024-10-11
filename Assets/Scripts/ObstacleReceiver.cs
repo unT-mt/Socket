@@ -3,8 +3,9 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using UnityEngine;
-using Cysharp.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 public class ObstacleReceiver : MonoBehaviour
@@ -27,11 +28,14 @@ public class ObstacleReceiver : MonoBehaviour
 
     private CancellationTokenSource cts;
 
+    // スレッドセーフなキューを使用して受信データをメインスレッドに渡す
+    private ConcurrentQueue<string> receivedDataQueue = new ConcurrentQueue<string>();
+
     void Start()
     {
         InitializeUdpClient();
         cts = new CancellationTokenSource();
-        StartReceivingData(cts.Token).Forget();
+        StartReceivingData(cts.Token);
     }
 
     void InitializeUdpClient()
@@ -48,51 +52,56 @@ public class ObstacleReceiver : MonoBehaviour
         }
     }
 
-    async UniTaskVoid StartReceivingData(CancellationToken token)
+    void StartReceivingData(CancellationToken token)
     {
-        try
+        Task.Run(async () =>
         {
-            while (!token.IsCancellationRequested)
+            try
             {
-                UdpReceiveResult result;
-                try
+                while (!token.IsCancellationRequested)
                 {
-                    result = await udpClient.ReceiveAsync();
-                }
-                catch (OperationCanceledException)
-                {
-                    // キャンセレーションが発生した場合
-                    Debug.Log("受信ループがキャンセルされました。");
-                    break;
-                }
-                catch (ObjectDisposedException)
-                {
-                    // UdpClient が閉じられた場合
-                    Debug.Log("UdpClient が閉じられました。受信ループを終了します。");
-                    break;
-                }
+                    UdpReceiveResult result;
+                    try
+                    {
+                        result = await udpClient.ReceiveAsync();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // キャンセレーションが発生した場合
+                        Debug.Log("受信ループがキャンセルされました。");
+                        break;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // UdpClient が閉じられた場合
+                        Debug.Log("UdpClient が閉じられました。受信ループを終了します。");
+                        break;
+                    }
 
-                // オブジェクトが破棄されている場合は処理を中断
-                if (this == null)
-                {
-                    Debug.LogWarning("ObstacleReceiverが既に破棄されています。受信ループを終了します。");
-                    break;
+                    string receivedData = Encoding.UTF8.GetString(result.Buffer).Trim();
+                    Debug.Log($"受信: {receivedData}");
+
+                    // データをキューに追加
+                    receivedDataQueue.Enqueue(receivedData);
                 }
-
-                string receivedData = Encoding.UTF8.GetString(result.Buffer).Trim();
-                Debug.Log($"受信: {receivedData}");
-
-                ParseAndPlaceObstacles(receivedData);
             }
-        }
-        catch (Exception e)
+            catch (Exception e)
+            {
+                Debug.LogError($"受信ループエラー: {e.Message}");
+            }
+            finally
+            {
+                Debug.Log("受信ループが終了しました。");
+            }
+        }, token);
+    }
+
+    void Update()
+    {
+        // キューからデータを処理
+        while (receivedDataQueue.TryDequeue(out string data))
         {
-            Debug.LogError($"受信ループエラー: {e.Message}");
-        }
-        finally
-        {
-            // finally ブロックから udpClient.Close() を削除
-            Debug.Log("受信ループが終了しました。");
+            ParseAndPlaceObstacles(data);
         }
     }
 

@@ -52,7 +52,7 @@ namespace Urg
                 RaycastHit hit;
 
                 // マウス位置でのRayのヒットを確認 (地面や特定の平面にヒットさせる)
-                if (Physics.Raycast(ray, out hit, 100.0f))
+                if (Physics.Raycast(ray, out hit, 100.0f) && Input.GetMouseButton(0))
                 {
                     Vector3 obstacleCenter = hit.point;
 

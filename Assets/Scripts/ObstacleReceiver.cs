@@ -13,12 +13,14 @@ public class ObstacleReceiver : MonoBehaviour
     [Header("UDP Settings")]
     public int listenPort = 5000; // 受信ポート
     public string serverIP = "127.0.0.1"; // 送信先のIPアドレス
-    public int serverPort = 5000; // 送信先のポート番号
 
     [Header("Obstacle Settings")]
     public GameObject obstaclePrefab; // 配置するPrefab
     public Transform obstaclesParent; // 障害物を格納する親オブジェクト
     public float maxDistance = 10f; // 最大距離
+
+    [Header("Reset Command Settings")]
+    public ResetCommandSender resetCommandSender; // リセット信号送信クラスへの参照
 
     private UdpClient udpClient;
     private IPEndPoint remoteEndPoint;
@@ -101,7 +103,22 @@ public class ObstacleReceiver : MonoBehaviour
         // キューからデータを処理
         while (receivedDataQueue.TryDequeue(out string data))
         {
-            ParseAndPlaceObstacles(data);
+            if (data.Equals("REQUEST_RESET", StringComparison.OrdinalIgnoreCase))
+            {
+                // リセット信号を送信
+                if (resetCommandSender != null)
+                {
+                    resetCommandSender.SendResetCommand();
+                }
+                else
+                {
+                    Debug.LogWarning("ResetCommandSender が割り当てられていません。");
+                }
+            }
+            else
+            {
+                ParseAndPlaceObstacles(data);
+            }
         }
     }
 

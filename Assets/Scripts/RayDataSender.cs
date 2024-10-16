@@ -2,7 +2,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks; // 追加
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Urg
@@ -18,6 +18,9 @@ namespace Urg
         private UdpClient udpClient;
         private IPEndPoint remoteEndPoint;
         private float lastSendTime = 0f;
+
+        // 送信状態を示すプロパティ
+        public bool IsSending { get; private set; } = true;
 
         void Start()
         {
@@ -58,9 +61,12 @@ namespace Urg
 
             await SendDataAsync(distances); // 非同期メソッドをawait
         }
-        
+
         public async Task SendDataAsync(float[] distances)
         {
+            if (!IsSending)
+            return;
+
             if (distances == null)
             {
                 Debug.LogWarning("Invalid distances array for sending.");
@@ -85,11 +91,35 @@ namespace Urg
             try
             {
                 await udpClient.SendAsync(sendData, sendData.Length, remoteEndPoint); // 非同期送信
-                Debug.Log($"送信: {csvData}");
+                //Debug.Log($"送信: {csvData}");
             }
             catch (Exception e)
             {
                 Debug.LogError($"送信エラー: {e.Message}");
+            }
+        }
+
+        public void StartSending()
+        {
+            if (!IsSending)
+            {
+                IsSending = true;
+                if (udpClient != null)
+                {
+                    udpClient.Close();
+                }
+                udpClient = new UdpClient();
+                Debug.Log("UDP送信を再開しました。");
+            }
+        }
+
+        public void StopSending()
+        {
+            if (IsSending)
+            {
+                IsSending = false;
+                udpClient.Close();
+                Debug.Log("UDP送信を停止しました。");
             }
         }
 

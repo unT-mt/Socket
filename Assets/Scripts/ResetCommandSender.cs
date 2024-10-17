@@ -13,6 +13,7 @@ public class ResetCommandSender : MonoBehaviour
 
     [Header("UI Settings")]
     public Button sendResetButton; // リセット信号送信用のUIボタン
+    public Button toggleUDPButton; // UDP接続切断/再開用のUIボタン
 
     private UdpClient udpClient;
     private IPEndPoint remoteEndPoint;
@@ -37,6 +38,15 @@ public class ResetCommandSender : MonoBehaviour
         {
             Debug.LogWarning("SendResetボタンが割り当てられていません。");
         }
+
+        if (toggleUDPButton != null)
+        {
+            toggleUDPButton.onClick.AddListener(SendUDPConnectionToggleCommand);
+        }
+        else
+        {
+            Debug.LogWarning("toggleUDPボタンが割り当てられていません。");
+        }
     }
     
     void Update()
@@ -44,6 +54,10 @@ public class ResetCommandSender : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.R))
         {
             SendResetCommand();
+        }
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            SendUDPConnectionToggleCommand();
         }
     }
 
@@ -62,6 +76,21 @@ public class ResetCommandSender : MonoBehaviour
         }
     }
 
+    public void SendUDPConnectionToggleCommand()
+    {
+        string resetMessage = "TOGGLE";
+        byte[] sendData = Encoding.UTF8.GetBytes(resetMessage);
+        try
+        {
+            udpClient.Send(sendData, sendData.Length, remoteEndPoint);
+            Debug.Log($"UDP接続切断/再開信号送信: {resetMessage}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"UDP接続切断/再開信号送信エラー: {e.Message}");
+        }
+    }
+
     private void OnDestroy()
     {
         if (udpClient != null)
@@ -72,6 +101,11 @@ public class ResetCommandSender : MonoBehaviour
         if (sendResetButton != null)
         {
             sendResetButton.onClick.RemoveListener(SendResetCommand);
+        }
+
+        if (toggleUDPButton != null)
+        {
+            toggleUDPButton.onClick.RemoveListener(SendUDPConnectionToggleCommand);
         }
     }
 }

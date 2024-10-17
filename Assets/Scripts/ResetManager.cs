@@ -12,7 +12,8 @@ namespace Urg
     public class ResetManager : MonoBehaviour
     {
         [Header("UI Settings")]
-        public Button resetButton; // リセット用のUIボタン
+        public Button appResetButton; // リセット信号送信用のUIボタン
+        public Button toggleUDPButton; // UDP接続切断/再開用のUIボタン
 
         [Header("UDP Reset Settings")]
         public int resetListenPort = 6000; // リセット信号を受信するポート
@@ -32,14 +33,23 @@ namespace Urg
                 return;
             }
 
-            if (resetButton != null)
+            if (appResetButton != null)
             {
-                resetButton.onClick.AddListener(ToggleConnection);
+                appResetButton.onClick.AddListener(RestartApp.RestartApplication);
+            }
+            else
+            {
+                Debug.LogWarning("appResetボタンが割り当てられていません。");
+            }
+
+            if (toggleUDPButton != null)
+            {
+                toggleUDPButton.onClick.AddListener(ToggleConnection);
                 UpdateButtonLabel();
             }
             else
             {
-                Debug.LogWarning("Resetボタンが割り当てられていません。");
+                Debug.LogWarning("toggleUDPボタンが割り当てられていません。");
             }
 
             InitializeUdpListener();
@@ -71,6 +81,10 @@ namespace Urg
                     Debug.Log($"Reset信号受信: {message}");
                     if (message.Equals("RESET", StringComparison.OrdinalIgnoreCase))
                     {
+                        RestartApp.RestartApplication();
+                    }
+                    if (message.Equals("TOGGLE", StringComparison.OrdinalIgnoreCase))
+                    {
                         ToggleConnection();
                     }
                 }
@@ -89,6 +103,10 @@ namespace Urg
         void Update()
         {
             if (Input.GetKeyDown(KeyCode.R))
+            {
+                RestartApp.RestartApplication();
+            }
+            if (Input.GetKeyDown(KeyCode.F))
             {
                 ToggleConnection();
             }
@@ -109,9 +127,9 @@ namespace Urg
 
         void UpdateButtonLabel()
         {
-            if (resetButton != null)
+            if (toggleUDPButton != null)
             {
-                resetButton.GetComponentInChildren<Text>().text = rayDataSender.IsSending ? "切断 (R)" : "再接続 (R)";
+                toggleUDPButton.GetComponentInChildren<Text>().text = rayDataSender.IsSending ? "切断 (F)" : "再接続 (F)";
             }
         }
 
@@ -128,9 +146,14 @@ namespace Urg
                 cts.Dispose();
             }
 
-            if (resetButton != null)
+            if (appResetButton != null)
             {
-                resetButton.onClick.RemoveListener(ToggleConnection);
+                appResetButton.onClick.RemoveListener(RestartApp.RestartApplication);
+            }
+
+            if (toggleUDPButton != null)
+            {
+                toggleUDPButton.onClick.RemoveListener(ToggleConnection);
             }
         }
     }

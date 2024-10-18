@@ -28,6 +28,10 @@ public class WindowControl : MonoBehaviour
         {
             SetWindowToBackground();
         }
+        else
+        {
+            Debug.LogError("WindowControl:Unityのウィンドウハンドルが取得できませんでした");
+        }
     }
 
     void Update()

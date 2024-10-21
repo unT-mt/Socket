@@ -13,8 +13,9 @@ namespace Urg
     public class ResetManager : MonoBehaviour
     {
         [Header("UI Settings")]
-        public Button appResetButton; // リセット信号送信用のUIボタン
-        public Button toggleUDPButton; // UDP接続切断/再開用のUIボタン
+        public Button resetSensorAppButton; // リセット信号送信用のUIボタン
+        public Button toggleUDPConnectionButton; // UDP接続切断/再開用のUIボタン
+        public Button resetURGInstanceButton; // UDP接続切断/再開用のUIボタン
 
         [Header("UDP Reset Settings")]
         public int resetListenPort = 6000; // リセット信号を受信するポート
@@ -23,7 +24,7 @@ namespace Urg
 
         public UrgSensorWrapper urgSensor; // Wrapperを経由したUrgSensor コンポーネントへの参照
         public RayDataSender rayDataSender; // RayDataSender への参照
-        private bool isResetting = false; // リセット処理中かどうかのフラグ
+        private bool isResettingURGSensor = false; // リセット処理中かどうかのフラグ
 
         private UdpClient resetUdpClient;
         private CancellationTokenSource cts;
@@ -37,23 +38,32 @@ namespace Urg
                 return;
             }
 
-            if (appResetButton != null)
+            if (resetSensorAppButton != null)
             {
-                appResetButton.onClick.AddListener(RestartApp.RestartApplication);
+                resetSensorAppButton.onClick.AddListener(RestartApp.RestartApplication);
             }
             else
             {
-                Debug.LogWarning("appResetボタンが割り当てられていません。");
+                Debug.LogWarning("resetSensorAppボタンが割り当てられていません。");
             }
 
-            if (toggleUDPButton != null)
+            if (toggleUDPConnectionButton != null)
             {
-                toggleUDPButton.onClick.AddListener(ToggleConnection);
+                toggleUDPConnectionButton.onClick.AddListener(ToggleConnection);
                 UpdateButtonLabel();
             }
             else
             {
-                Debug.LogWarning("toggleUDPボタンが割り当てられていません。");
+                Debug.LogWarning("toggleUDPConnectionボタンが割り当てられていません。");
+            }
+
+            if (resetURGInstanceButton != null)
+            {
+                resetURGInstanceButton.onClick.AddListener(ResetUrgSensor);
+            }
+            else
+            {
+                Debug.LogWarning("resetURGInstanceボタンが割り当てられていません。");
             }
 
             InitializeUdpListener();
@@ -83,13 +93,17 @@ namespace Urg
                     UdpReceiveResult result = await resetUdpClient.ReceiveAsync();
                     string message = Encoding.UTF8.GetString(result.Buffer).Trim();
                     Debug.Log($"Reset信号受信: {message}");
-                    if (message.Equals("RESET", StringComparison.OrdinalIgnoreCase))
+                    if (message.Equals("RESET_SENSORAPP", StringComparison.OrdinalIgnoreCase))
                     {
                         RestartApp.RestartApplication();
                     }
-                    if (message.Equals("TOGGLE", StringComparison.OrdinalIgnoreCase))
+                    if (message.Equals("TOGGLE_UDPCONNECTION", StringComparison.OrdinalIgnoreCase))
                     {
                         ToggleConnection();
+                    }
+                    if (message.Equals("RESET_URGINSTANCE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ResetUrgSensor();
                     }
                 }
             }
@@ -114,10 +128,9 @@ namespace Urg
             {
                 ToggleConnection();
             }
-            // Vキーが押されたとき
-            if (Input.GetKeyDown(KeyCode.V) && !isResetting)
+            if (Input.GetKeyDown(KeyCode.V))
             {
-                StartCoroutine(ResetUrgSensor());
+                ResetUrgSensor();
             }
         }
 
@@ -136,9 +149,37 @@ namespace Urg
 
         void UpdateButtonLabel()
         {
-            if (toggleUDPButton != null)
+            if (toggleUDPConnectionButton != null)
             {
-                toggleUDPButton.GetComponentInChildren<Text>().text = rayDataSender.IsSending ? "切断 (F)" : "再接続 (F)";
+                toggleUDPConnectionButton.GetComponentInChildren<Text>().text = rayDataSender.IsSending ? "切断 (F)" : "再接続 (F)";
+            }
+        }
+
+        void ResetUrgSensor()
+        {
+            StartCoroutine(ResetUrgSensorCoroutine());
+        }
+
+        private IEnumerator ResetUrgSensorCoroutine()
+        {
+            if(!isResettingURGSensor)
+            {
+                isResettingURGSensor = true;
+                resetURGInstanceButton.GetComponentInChildren<Text>().text =  "リセット中...";
+                // センサーの停止
+                rayDataSender.StopSending();
+                urgSensor.RestartSensor(); // 新たに追加したRestartSensor()メソッドを呼び出す
+                Debug.Log("URGセンサーの受信をリセットしました。");
+
+                // 5秒待機
+                yield return new WaitForSeconds(6);
+
+                // センサーの再開
+                rayDataSender.StartSending();
+                Debug.Log("URGセンサーの受信を再開しました。");
+                
+                resetURGInstanceButton.GetComponentInChildren<Text>().text =  "URGリセット (V)";
+                isResettingURGSensor = false;
             }
         }
 
@@ -155,34 +196,20 @@ namespace Urg
                 cts.Dispose();
             }
 
-            if (appResetButton != null)
+            if (resetSensorAppButton != null)
             {
-                appResetButton.onClick.RemoveListener(RestartApp.RestartApplication);
+                resetSensorAppButton.onClick.RemoveListener(RestartApp.RestartApplication);
             }
 
-            if (toggleUDPButton != null)
+            if (toggleUDPConnectionButton != null)
             {
-                toggleUDPButton.onClick.RemoveListener(ToggleConnection);
+                toggleUDPConnectionButton.onClick.RemoveListener(ToggleConnection);
             }
-        }
 
-        private IEnumerator ResetUrgSensor()
-        {
-            isResetting = true;
-
-            // センサーの停止
-            rayDataSender.StopSending();
-            urgSensor.RestartSensor(); // 新たに追加したRestartSensor()メソッドを呼び出す
-            Debug.Log("URGセンサーの受信をリセットしました。");
-
-            // 5秒待機
-            yield return new WaitForSeconds(6);
-
-            // センサーの再開
-            rayDataSender.StartSending();
-            Debug.Log("URGセンサーの受信を再開しました。");
-
-            isResetting = false;
+            if (resetURGInstanceButton != null)
+            {
+                resetURGInstanceButton.onClick.RemoveListener(ResetUrgSensor);
+            }
         }
     }
 }

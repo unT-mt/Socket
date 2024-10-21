@@ -12,8 +12,9 @@ public class ResetCommandSender : MonoBehaviour
     public int senderResetPort = 6000; // センサー送信側のリセット受信ポート
 
     [Header("UI Settings")]
-    public Button sendResetButton; // リセット信号送信用のUIボタン
-    public Button toggleUDPButton; // UDP接続切断/再開用のUIボタン
+    public Button resetSensorAppButton; // リセット信号送信用のUIボタン
+    public Button toggleUDPConnectionButton; // UDP接続切断/再開用のUIボタン
+    public Button resetURGInstanceButton; // UDP接続切断/再開用のUIボタン
 
     private UdpClient udpClient;
     private IPEndPoint remoteEndPoint;
@@ -30,22 +31,31 @@ public class ResetCommandSender : MonoBehaviour
             Debug.LogError($"ResetCommandSender のUDP初期化エラー: {e.Message}");
         }
 
-        if (sendResetButton != null)
+        if (resetSensorAppButton != null)
         {
-            sendResetButton.onClick.AddListener(SendResetCommand);
+            resetSensorAppButton.onClick.AddListener(SendResetCommand);
         }
         else
         {
-            Debug.LogWarning("SendResetボタンが割り当てられていません。");
+            Debug.LogWarning("SendResetCommandが割り当てられていません。");
         }
 
-        if (toggleUDPButton != null)
+        if (toggleUDPConnectionButton != null)
         {
-            toggleUDPButton.onClick.AddListener(SendUDPConnectionToggleCommand);
+            toggleUDPConnectionButton.onClick.AddListener(SendUDPConnectionToggleCommand);
         }
         else
         {
-            Debug.LogWarning("toggleUDPボタンが割り当てられていません。");
+            Debug.LogWarning("SendUDPConnectionToggleCommandが割り当てられていません。");
+        }
+
+        if (resetURGInstanceButton != null)
+        {
+            resetURGInstanceButton.onClick.AddListener(SendURGInstanceResetCommand);
+        }
+        else
+        {
+            Debug.LogWarning("SendURGInstanceResetCommandが割り当てられていません。");
         }
     }
     
@@ -59,26 +69,30 @@ public class ResetCommandSender : MonoBehaviour
         {
             SendUDPConnectionToggleCommand();
         }
+        if (Input.GetKeyDown(KeyCode.V))
+        {
+            SendURGInstanceResetCommand();
+        }
     }
 
     public void SendResetCommand()
     {
-        string resetMessage = "RESET";
+        string resetMessage = "RESET_SENSORAPP";
         byte[] sendData = Encoding.UTF8.GetBytes(resetMessage);
         try
         {
             udpClient.Send(sendData, sendData.Length, remoteEndPoint);
-            Debug.Log($"リセット信号送信: {resetMessage}");
+            Debug.Log($"センサー送信アプリリセット信号送信: {resetMessage}");
         }
         catch (Exception e)
         {
-            Debug.LogError($"リセット信号送信エラー: {e.Message}");
+            Debug.LogError($"センサー送信アプリリセット信号送信エラー: {e.Message}");
         }
     }
 
     public void SendUDPConnectionToggleCommand()
     {
-        string resetMessage = "TOGGLE";
+        string resetMessage = "TOGGLE_UDPCONNECTION";
         byte[] sendData = Encoding.UTF8.GetBytes(resetMessage);
         try
         {
@@ -91,6 +105,21 @@ public class ResetCommandSender : MonoBehaviour
         }
     }
 
+    public void SendURGInstanceResetCommand()
+    {
+        string resetMessage = "RESET_URGINSTANCE";
+        byte[] sendData = Encoding.UTF8.GetBytes(resetMessage);
+        try
+        {
+            udpClient.Send(sendData, sendData.Length, remoteEndPoint);
+            Debug.Log($"URGリセット信号送信: {resetMessage}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"URGリセット信号信号送信エラー: {e.Message}");
+        }
+    }
+
     private void OnDestroy()
     {
         if (udpClient != null)
@@ -98,14 +127,19 @@ public class ResetCommandSender : MonoBehaviour
             udpClient.Close();
         }
 
-        if (sendResetButton != null)
+        if (resetSensorAppButton != null)
         {
-            sendResetButton.onClick.RemoveListener(SendResetCommand);
+            resetSensorAppButton.onClick.RemoveListener(SendResetCommand);
         }
 
-        if (toggleUDPButton != null)
+        if (toggleUDPConnectionButton != null)
         {
-            toggleUDPButton.onClick.RemoveListener(SendUDPConnectionToggleCommand);
+            toggleUDPConnectionButton.onClick.RemoveListener(SendUDPConnectionToggleCommand);
+        }
+
+        if (resetURGInstanceButton != null)
+        {
+            resetURGInstanceButton.onClick.RemoveListener(SendURGInstanceResetCommand);
         }
     }
 }

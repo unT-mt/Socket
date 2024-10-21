@@ -171,7 +171,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 114570632567851138, guid: 3eaf2bf61050a4d27b43578e355c6b9b, type: 3}
   m_PrefabInstance: {fileID: 167230689}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 2005201723}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d8911222ca91b4c838ffa7b19764b973, type: 3}
@@ -236,7 +236,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1964391196819068, guid: 3eaf2bf61050a4d27b43578e355c6b9b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2005201726}
   m_SourcePrefab: {fileID: 100100000, guid: 3eaf2bf61050a4d27b43578e355c6b9b, type: 3}
 --- !u!1 &321591221
 GameObject:
@@ -1482,6 +1485,8 @@ MonoBehaviour:
   resetListenPort: 6000
   senderIP: 127.0.0.1
   senderPort: 5000
+  urgSensor: {fileID: 2005201726}
+  rayDataSender: {fileID: 1476481332}
 --- !u!114 &1476481339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1909,6 +1914,23 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1747139557}
   m_CullTransparentMesh: 1
+--- !u!1 &2005201723 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1964391196819068, guid: 3eaf2bf61050a4d27b43578e355c6b9b, type: 3}
+  m_PrefabInstance: {fileID: 167230689}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2005201726
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2005201723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a237899ceef8ab84e8f3143595acec2c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2056653795
 GameObject:
   m_ObjectHideFlags: 0

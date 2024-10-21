@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 namespace Urg
 {
@@ -20,9 +21,12 @@ namespace Urg
         public string senderIP = "127.0.0.1"; // リセット信号を送信する送信元IPアドレス
         public int senderPort = 5000; // リセット信号を送信する送信元ポート番号
 
+        public UrgSensorWrapper urgSensor; // Wrapperを経由したUrgSensor コンポーネントへの参照
+        public RayDataSender rayDataSender; // RayDataSender への参照
+        private bool isResetting = false; // リセット処理中かどうかのフラグ
+
         private UdpClient resetUdpClient;
         private CancellationTokenSource cts;
-        private RayDataSender rayDataSender;
 
         void Start()
         {
@@ -110,6 +114,11 @@ namespace Urg
             {
                 ToggleConnection();
             }
+            // Vキーが押されたとき
+            if (Input.GetKeyDown(KeyCode.V) && !isResetting)
+            {
+                StartCoroutine(ResetUrgSensor());
+            }
         }
 
         public void ToggleConnection()
@@ -155,6 +164,25 @@ namespace Urg
             {
                 toggleUDPButton.onClick.RemoveListener(ToggleConnection);
             }
+        }
+
+        private IEnumerator ResetUrgSensor()
+        {
+            isResetting = true;
+
+            // センサーの停止
+            rayDataSender.StopSending();
+            urgSensor.RestartSensor(); // 新たに追加したRestartSensor()メソッドを呼び出す
+            Debug.Log("URGセンサーの受信をリセットしました。");
+
+            // 5秒待機
+            yield return new WaitForSeconds(6);
+
+            // センサーの再開
+            rayDataSender.StartSending();
+            Debug.Log("URGセンサーの受信を再開しました。");
+
+            isResetting = false;
         }
     }
 }

@@ -4,7 +4,7 @@ using System.Collections;
 public class UrgSensorWrapper : MonoBehaviour
 {
     private Urg.UrgSensor urgSensor;
-    private int retryAttempts = 3;  // 再接続の試行回数
+    private int retryAttempts = 1;  // 再接続の試行回数
     private float retryDelay = 2.0f;  // 再接続を試行するまでの待ち時間
 
     void Awake()

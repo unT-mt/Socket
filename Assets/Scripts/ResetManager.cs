@@ -1,12 +1,13 @@
 using System;
-using System.Net;
+using System.Collections;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections;
+using WindowsInput;
+using WindowsInput.Native;
 
 namespace Urg
 {
@@ -29,6 +30,16 @@ namespace Urg
         private UdpClient resetUdpClient;
         private CancellationTokenSource cts;
 
+        private InputSimulator inputSimulator;
+
+        public Dropdown restartKeyDropdown;
+        public Dropdown toggleKeyDropdown;
+        public Dropdown resetSensorKeyDropdown;
+
+        private Dictionary<string, VirtualKeyCode> keyMappings;
+
+        private Dictionary<string, bool> previousKeyState;
+
         void Start()
         {
             rayDataSender = GetComponent<RayDataSender>();
@@ -38,13 +49,23 @@ namespace Urg
                 return;
             }
 
+            inputSimulator = new InputSimulator(); // InputSimulatorの初期化
+
+            // 前回のキー状態を追跡する辞書を初期化
+            previousKeyState = new Dictionary<string, bool>
+            {
+                { "RestartKey", false },
+                { "ToggleKey", false },
+                { "ResetSensorKey", false }
+            };
+
+            // 初回起動時にデフォルトのキーバインディングを設定
+            InitializeDefaultKeyBindings();
+
+            // UIボタンの設定
             if (resetSensorAppButton != null)
             {
                 resetSensorAppButton.onClick.AddListener(RestartApp.RestartApplication);
-            }
-            else
-            {
-                Debug.LogWarning("resetSensorAppボタンが割り当てられていません。");
             }
 
             if (toggleUDPConnectionButton != null)
@@ -52,21 +73,39 @@ namespace Urg
                 toggleUDPConnectionButton.onClick.AddListener(ToggleConnection);
                 UpdateButtonLabel();
             }
-            else
-            {
-                Debug.LogWarning("toggleUDPConnectionボタンが割り当てられていません。");
-            }
 
             if (resetURGInstanceButton != null)
             {
                 resetURGInstanceButton.onClick.AddListener(ResetUrgSensor);
             }
-            else
+
+            // キーバインディングの設定
+            InitializeKeyMappings();
+            InitializeDropdowns();
+
+            // UDPリスナー初期化
+            InitializeUdpListener();
+        }
+
+        private void InitializeDefaultKeyBindings()
+        {
+            // 初回起動時のみデフォルトのキー設定を行う
+            if (!PlayerPrefs.HasKey("RestartKey"))
             {
-                Debug.LogWarning("resetURGInstanceボタンが割り当てられていません。");
+                PlayerPrefs.SetString("RestartKey", "VK_R");
             }
 
-            InitializeUdpListener();
+            if (!PlayerPrefs.HasKey("ToggleKey"))
+            {
+                PlayerPrefs.SetString("ToggleKey", "VK_F");
+            }
+
+            if (!PlayerPrefs.HasKey("ResetSensorKey"))
+            {
+                PlayerPrefs.SetString("ResetSensorKey", "VK_V");
+            }
+
+            PlayerPrefs.Save(); // 設定を保存
         }
 
         void InitializeUdpListener()
@@ -118,20 +157,86 @@ namespace Urg
             }
         }
 
+        void InitializeKeyMappings()
+        {
+            // VirtualKeyCodeのマッピングを設定
+            keyMappings = new Dictionary<string, VirtualKeyCode>();
+
+            // キーボードの標準的なキーのみを追加 (A～Z, 数字, F1～F12, 矢印キー)
+            List<VirtualKeyCode> allowedKeys = new List<VirtualKeyCode>
+            {
+                VirtualKeyCode.VK_A, VirtualKeyCode.VK_B, VirtualKeyCode.VK_C, VirtualKeyCode.VK_D, VirtualKeyCode.VK_E,
+                VirtualKeyCode.VK_F, VirtualKeyCode.VK_G, VirtualKeyCode.VK_H, VirtualKeyCode.VK_I, VirtualKeyCode.VK_J,
+                VirtualKeyCode.VK_K, VirtualKeyCode.VK_L, VirtualKeyCode.VK_M, VirtualKeyCode.VK_N, VirtualKeyCode.VK_O,
+                VirtualKeyCode.VK_P, VirtualKeyCode.VK_Q, VirtualKeyCode.VK_R, VirtualKeyCode.VK_S, VirtualKeyCode.VK_T,
+                VirtualKeyCode.VK_U, VirtualKeyCode.VK_V, VirtualKeyCode.VK_W, VirtualKeyCode.VK_X, VirtualKeyCode.VK_Y, VirtualKeyCode.VK_Z,
+                VirtualKeyCode.VK_0, VirtualKeyCode.VK_1, VirtualKeyCode.VK_2, VirtualKeyCode.VK_3, VirtualKeyCode.VK_4,
+                VirtualKeyCode.VK_5, VirtualKeyCode.VK_6, VirtualKeyCode.VK_7, VirtualKeyCode.VK_8, VirtualKeyCode.VK_9,
+                VirtualKeyCode.F1, VirtualKeyCode.F2, VirtualKeyCode.F3, VirtualKeyCode.F4, VirtualKeyCode.F5,
+                VirtualKeyCode.F6, VirtualKeyCode.F7, VirtualKeyCode.F8, VirtualKeyCode.F9, VirtualKeyCode.F10, VirtualKeyCode.F11, VirtualKeyCode.F12,
+                VirtualKeyCode.LEFT, VirtualKeyCode.RIGHT, VirtualKeyCode.UP, VirtualKeyCode.DOWN
+            };
+
+            // フィルタリングしたキーのみ辞書に追加
+            foreach (VirtualKeyCode key in allowedKeys)
+            {
+                keyMappings[key.ToString()] = key;
+            }
+        }
+
+        private void InitializeDropdowns()
+        {
+            // フィルタリングされたキーのみオプションとして追加
+            List<string> keyOptions = new List<string>(keyMappings.Keys);
+
+            restartKeyDropdown.ClearOptions();
+            toggleKeyDropdown.ClearOptions();
+            resetSensorKeyDropdown.ClearOptions();
+
+            restartKeyDropdown.AddOptions(keyOptions);
+            toggleKeyDropdown.AddOptions(keyOptions);
+            resetSensorKeyDropdown.AddOptions(keyOptions);
+
+            // 保存された設定の読み込み
+            restartKeyDropdown.value = keyOptions.IndexOf(PlayerPrefs.GetString("RestartKey", "VK_R"));
+            toggleKeyDropdown.value = keyOptions.IndexOf(PlayerPrefs.GetString("ToggleKey", "VK_F"));
+            resetSensorKeyDropdown.value = keyOptions.IndexOf(PlayerPrefs.GetString("ResetSensorKey", "VK_V"));
+
+            // キーバインディング変更時の処理
+            restartKeyDropdown.onValueChanged.AddListener(delegate { OnKeyBindingChanged("RestartKey", restartKeyDropdown); });
+            toggleKeyDropdown.onValueChanged.AddListener(delegate { OnKeyBindingChanged("ToggleKey", toggleKeyDropdown); });
+            resetSensorKeyDropdown.onValueChanged.AddListener(delegate { OnKeyBindingChanged("ResetSensorKey", resetSensorKeyDropdown); });
+        }
+
+        private void OnKeyBindingChanged(string keyName, Dropdown dropdown)
+        {
+            string selectedKey = dropdown.options[dropdown.value].text;
+            PlayerPrefs.SetString(keyName, selectedKey);
+            PlayerPrefs.Save();
+        }
+
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.R))
+            CheckKeyPress("RestartKey", () => RestartApp.RestartApplication());
+            CheckKeyPress("ToggleKey", () => ToggleConnection());
+            CheckKeyPress("ResetSensorKey", () => ResetUrgSensor());
+        }
+
+        private void CheckKeyPress(string keyName, Action action)
+        {
+            string key = PlayerPrefs.GetString(keyName, keyName == "RestartKey" ? "VK_R" : keyName == "ToggleKey" ? "VK_F" : "VK_V");
+            
+            // 現在のキーの状態を取得
+            bool isKeyDown = inputSimulator.InputDeviceState.IsKeyDown(keyMappings[key]);
+
+            // 前回のキー状態と比較し、現在押されていて前回押されていない場合にのみ処理を実行
+            if (isKeyDown && !previousKeyState[keyName])
             {
-                RestartApp.RestartApplication();
+                action.Invoke(); // 指定されたアクションを実行
             }
-            if (Input.GetKeyDown(KeyCode.F))
-            {
-                ToggleConnection();
-            }
-            if (Input.GetKeyDown(KeyCode.V))
-            {
-                ResetUrgSensor();
-            }
+
+            // 現在のキー状態を保存
+            previousKeyState[keyName] = isKeyDown;
         }
 
         public void ToggleConnection()
@@ -151,7 +256,7 @@ namespace Urg
         {
             if (toggleUDPConnectionButton != null)
             {
-                toggleUDPConnectionButton.GetComponentInChildren<Text>().text = rayDataSender.IsSending ? "切断 (F)" : "再接続 (F)";
+                toggleUDPConnectionButton.GetComponentInChildren<Text>().text = rayDataSender.IsSending ? "切断" : "再接続";
             }
         }
 
@@ -162,23 +267,15 @@ namespace Urg
 
         private IEnumerator ResetUrgSensorCoroutine()
         {
-            if(!isResettingURGSensor)
+            if (!isResettingURGSensor)
             {
                 isResettingURGSensor = true;
-                resetURGInstanceButton.GetComponentInChildren<Text>().text =  "リセット中...";
-                // センサーの停止
+                resetURGInstanceButton.GetComponentInChildren<Text>().text = "リセット中...";
                 rayDataSender.StopSending();
-                urgSensor.RestartSensor(); // 新たに追加したRestartSensor()メソッドを呼び出す
-                Debug.Log("URGセンサーの受信をリセットしました。");
-
-                // 5秒待機
+                urgSensor.RestartSensor();
                 yield return new WaitForSeconds(6);
-
-                // センサーの再開
                 rayDataSender.StartSending();
-                Debug.Log("URGセンサーの受信を再開しました。");
-                
-                resetURGInstanceButton.GetComponentInChildren<Text>().text =  "URGリセット (V)";
+                resetURGInstanceButton.GetComponentInChildren<Text>().text = "URGリセット";
                 isResettingURGSensor = false;
             }
         }

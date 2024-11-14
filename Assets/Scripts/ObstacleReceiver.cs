@@ -193,6 +193,19 @@ public class ObstacleReceiver : MonoBehaviour
         return position;
     }
 
+    public Dictionary<int, float> GetObstacleData()
+    {
+        // 障害物のデータ（光線ID -> 距離）を返す
+        Dictionary<int, float> obstacleData = new Dictionary<int, float>();
+        foreach (var entry in obstacles)
+        {
+            int rayId = entry.Key;
+            float distance = Vector3.Distance(transform.position, entry.Value.transform.position);
+            obstacleData.Add(rayId, distance);
+        }
+        return obstacleData;
+    }
+
     private void OnDestroy()
     {
         if (cts != null)

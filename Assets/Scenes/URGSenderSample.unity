@@ -3489,7 +3489,7 @@ MonoBehaviour:
   rotateKey: 32
   rotationAngle: 180
   zoomSpeed: 5
-  minY: 5
+  minY: 0.5
   maxY: 20
   pinchZoomSpeed: 0.1
   panSpeed: 0.5
@@ -3736,7 +3736,7 @@ MonoBehaviour:
   rayVisualizer: {fileID: 1476481333}
   rayDataSender: {fileID: 1476481332}
   mainCamera: {fileID: 1412082345}
-  obstacleRadius: 0.2
+  obstacleRadius: 0.02
   maxRayDistance: 10
 --- !u!114 &1476481338
 MonoBehaviour:

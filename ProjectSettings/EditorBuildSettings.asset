@@ -6,15 +6,15 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 0
-    path: Assets/Scenes/Client.unity
+    path: Assets/Scenes/SocketTest/Client.unity
     guid: 2de7d1322b58247448de0f77cdaa4b76
   - enabled: 0
-    path: Assets/Scenes/Server.unity
+    path: Assets/Scenes/SocketTest/Server.unity
     guid: 9fc0d4010bbf28b4594072e72b8655ab
-  - enabled: 0
+  - enabled: 1
     path: Assets/Scenes/URGSenderSample.unity
     guid: f425662e23e138b438652a5ca5899c6f
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/URGReceiverSample.unity
     guid: 9af6c59d406baf94fa75bca4d910bcc0
   m_configObjects: {}

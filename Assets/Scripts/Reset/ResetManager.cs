@@ -42,13 +42,6 @@ namespace Urg
 
         void Start()
         {
-            rayDataSender = GetComponent<RayDataSender>();
-            if (rayDataSender == null)
-            {
-                Debug.LogError("RayDataSender コンポーネントが見つかりません。");
-                return;
-            }
-
             inputSimulator = new InputSimulator(); // InputSimulatorの初期化
 
             // 前回のキー状態を追跡する辞書を初期化

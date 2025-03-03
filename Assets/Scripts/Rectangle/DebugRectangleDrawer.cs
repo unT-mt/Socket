@@ -29,6 +29,10 @@ public class DebugRectangleDrawer : MonoBehaviour
     [Tooltip("線の太さ (start/end width) を指定")]
     public float lineWidth = 0.02f;
 
+    [Header("Material")]
+    [Tooltip("Unlit/Color を使ったマテリアルをアサインしておく")]
+    public Material lineMaterial;
+
     private LineRenderer lineRenderer;
 
     // 4点のローカル座標 (X,Z平面に投影するとして、Vector2をX=横, Y=奥行きとみなす)
@@ -56,23 +60,31 @@ public class DebugRectangleDrawer : MonoBehaviour
             lineRenderer = gameObject.AddComponent<LineRenderer>();
         }
 
-        // 線の見た目を設定 (デフォルトで赤)
+        // 線の設定
         lineRenderer.startWidth = lineWidth;
         lineRenderer.endWidth = lineWidth;
         lineRenderer.loop = true;   // 4つの点をループさせて閉じた形にする
 
-        // マテリアルをUnlit/Colorなどにして赤くするとシンプル
-        // ※任意のマテリアルに差し替えてください
-        Material mat = new Material(Shader.Find("Unlit/Color"));
-        mat.color = Color.red;
-        lineRenderer.material = mat;
+        // Inspector から割り当ててもらう Material を使用
+        // もし null であれば警告を出し、Standard Shader をfallbackとして割り当てる
+        if (lineMaterial != null)
+        {
+            // 赤色に上書き
+            lineMaterial.color = Color.red;
+            lineRenderer.material = lineMaterial;
+        }
+        else
+        {
+            Debug.LogWarning("lineMaterial がアサインされていません。Standard にフォールバックします。");
+            Material fallback = new Material(Shader.Find("Standard"));
+            fallback.color = Color.red;
+            lineRenderer.material = fallback;
+        }
 
-        // ワールド座標系で描画するかどうか
-        //   true : センサーが動くと線が追従しない(絶対座標)
-        //   false: このLineRendererオブジェクトがセンサーの子要素ならローカル座標系で描画
+        // ローカル座標系で描画 (センサーの子オブジェクトになっていれば追従)
         lineRenderer.useWorldSpace = false;
 
-        // ▼ PlayerPrefs から値を読み込み (存在しなければデフォルト値)
+        // PlayerPrefs から値を読み込み (なければデフォルト値)
         float frx = PlayerPrefs.GetFloat(KEY_FRX, 0.96f);
         float fry = PlayerPrefs.GetFloat(KEY_FRY, 1.28f);
         float flx = PlayerPrefs.GetFloat(KEY_FLX, -0.96f);
@@ -81,6 +93,12 @@ public class DebugRectangleDrawer : MonoBehaviour
         float bly = PlayerPrefs.GetFloat(KEY_BLY, 0.20f);
         float brx = PlayerPrefs.GetFloat(KEY_BRX, 0.96f);
         float bry = PlayerPrefs.GetFloat(KEY_BRY, 0.20f);
+
+        // Debug.Log($"[DebugRectangleDrawer Awake] " +
+        //           $"FRX={frx}, FRY={fry}, " +
+        //           $"FLX={flx}, FLY={fly}, " +
+        //           $"BLX={blx}, BLY={bly}, " +
+        //           $"BRX={brx}, BRY={bry}");
 
         frontRight = new Vector2(frx, fry);
         frontLeft  = new Vector2(flx, fly);
@@ -91,17 +109,17 @@ public class DebugRectangleDrawer : MonoBehaviour
     private void Start()
     {
         // UIのInputFieldに読み込んだ値を反映
-        frontRightX.text = frontRight.x.ToString("F2");
-        frontRightY.text = frontRight.y.ToString("F2");
+        frontRightX.text = frontRight.x.ToString("F3");
+        frontRightY.text = frontRight.y.ToString("F3");
 
-        frontLeftX.text = frontLeft.x.ToString("F2");
-        frontLeftY.text = frontLeft.y.ToString("F2");
+        frontLeftX.text = frontLeft.x.ToString("F3");
+        frontLeftY.text = frontLeft.y.ToString("F3");
 
-        backLeftX.text = backLeft.x.ToString("F2");
-        backLeftY.text = backLeft.y.ToString("F2");
+        backLeftX.text = backLeft.x.ToString("F3");
+        backLeftY.text = backLeft.y.ToString("F3");
 
-        backRightX.text = backRight.x.ToString("F2");
-        backRightY.text = backRight.y.ToString("F2");
+        backRightX.text = backRight.x.ToString("F3");
+        backRightY.text = backRight.y.ToString("F3");
 
         // 初期描画
         UpdateLinePositions();
@@ -115,7 +133,6 @@ public class DebugRectangleDrawer : MonoBehaviour
         // それぞれのテキストを float に変換できるなら変換し、構造体に反映
         float frx, fry, flx, fly, blx, bly, brx, bry;
 
-        // 失敗した場合は無視するようにTryParse
         if (float.TryParse(frontRightX.text, out frx)) frontRight.x = frx;
         if (float.TryParse(frontRightY.text, out fry)) frontRight.y = fry;
 
@@ -152,17 +169,11 @@ public class DebugRectangleDrawer : MonoBehaviour
     /// </summary>
     private void UpdateLinePositions()
     {
-        // LineRendererに渡すのは Vector3[]
-        //   x => local x
-        //   y => local z  (仮に高さは0とし、XZ平面で見た四角にする)
-        // センサーのローカル座標に合わせるなら useWorldSpace = false 推奨
-        // ※ transform自体がsensorTransformの子になっていると仮定
-
         Vector3[] corners = new Vector3[4];
-        corners[0] = new Vector3(frontRight.x, 0f, frontRight.y); // 右手前
-        corners[1] = new Vector3(frontLeft.x,  0f, frontLeft.y);  // 左手前
-        corners[2] = new Vector3(backLeft.x,   0f, backLeft.y);   // 左奥
-        corners[3] = new Vector3(backRight.x,  0f, backRight.y);  // 右奥
+        corners[0] = new Vector3(frontRight.x, 0f, frontRight.y);
+        corners[1] = new Vector3(frontLeft.x,  0f, frontLeft.y);
+        corners[2] = new Vector3(backLeft.x,   0f, backLeft.y);
+        corners[3] = new Vector3(backRight.x,  0f, backRight.y);
 
         lineRenderer.positionCount = corners.Length;
         lineRenderer.SetPositions(corners);
